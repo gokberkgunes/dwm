@@ -139,6 +139,7 @@ typedef struct {
 	unsigned int tags;
 	int isfloating;
 	int monitor;
+	int floatx, floaty, floatw, floath;
 } Rule;
 
 /* function declarations */
@@ -280,7 +281,7 @@ void
 applyrules(Client *c)
 {
 	const char *class, *instance;
-	unsigned int i;
+	unsigned int i, sign, x_exceeds, y_exceeds;
 	const Rule *r;
 	Monitor *m;
 	XClassHint ch = { NULL, NULL };
@@ -300,6 +301,78 @@ applyrules(Client *c)
 		{
 			c->isfloating = r->isfloating;
 			c->tags |= r->tags;
+			/* if floating is defined:
+			 * only x exceeds 2, only y exceeds 1, both 3, none 0
+			 * exceeds are same if floatx and floaty to set 1 or -1.
+			 */
+			x_exceeds = y_exceeds = 0;
+			if (r->isfloating) {
+				if (r->floatw > 0) {
+					if (r ->floatw > c->mon->ww)
+						c->w = c->mon->ww
+							- 2*(gappx + c->bw);
+					else
+						c->w = r->floatw;
+				}
+				if (r->floath > 0) {
+					if (r ->floath > c->mon->wh)
+						c->h = c->mon->wh
+							- 2*(gappx + c->bw);
+					else
+						c->h = r->floath;
+				}
+				x_exceeds = 2*MAX((abs(r->floatx) + WIDTH(c)/2
+					> (c->mon->mw - gappx)/2),
+					(abs(r->floatx) == 1));
+				y_exceeds = MAX(abs(r->floaty) + HEIGHT(c)/2
+					> (c->mon->mh - gappx)/2,
+					(abs(r->floaty) == 1));
+			}
+			switch(x_exceeds + y_exceeds) {
+				default:
+				/* nothing exceeds monitor borders */
+				case 0:
+					/* POSSIBLE BUG:
+					 * removed c->mon->mx is 0 for 1 monitor
+					 */
+					c->x = c->mon->mx + r->floatx
+						+ (c->mon->ww - WIDTH(c)) / 2;
+					/* POSSIBLE BUG: removed c->mon->my is 0 for 1 monitor */
+					c->y = c->mon->my - r->floaty
+						+ (c->mon->wh - HEIGHT(c)) / 2;
+					//c->y = c->mon->my + (c->mon->wh - c->h) / 2;
+					break;
+				/* only y exceeds borders */
+				case 1:
+					sign = r->floaty < 0;
+					c->y = c->mon->my + sign * (c->mon->mh + (1 - 2 * sign) * (c->h + 2*borderpx)) //when lower (-1)
+						+ (1 - sign) * bh // when upper area (1)
+						+ (1 - 2 * sign) * gappx;
+					c->x = c->mon->mx + r->floatx
+						+ (c->mon->ww - WIDTH(c)) / 2;
+					break;
+				/* only x exceeds borders */
+				case 2:
+					sign = r->floatx < 0;
+					c->x = c->mon->mx
+						+ (1 - sign) * (c->mon->mw - (1 - 2 * sign) * (c->w + 2*borderpx))
+						- (1 - 2 * sign) * gappx;
+
+					c->y = c->mon->my - r->floaty
+						+ (c->mon->wh - HEIGHT(c)) / 2;
+					//c->y = c->mon->my + (c->mon->wh - c->h) / 2;
+					break;
+				/* both x and y exceeds borders */
+				case 3:
+					sign = r->floatx < 0;
+					c->x = c->mon->mx
+						+ (1 - sign) * (c->mon->mw - (1 - 2 * sign) * (c->w + 2*borderpx))
+						- (1 - 2 * sign) * gappx;
+					sign = r->floaty < 0;
+					c->y = c->mon->my + sign * (c->mon->mh + (1 - 2 * sign) * (c->h + 2*borderpx)) //when lower (-1)
+						+ (1 - sign) * bh // when upper area (1)
+						+ (1 - 2 * sign) * gappx;
+			}
 			for (m = mons; m && m->num != r->monitor; m = m->next);
 			if (m)
 				c->mon = m;
