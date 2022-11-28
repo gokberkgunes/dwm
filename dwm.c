@@ -92,7 +92,7 @@ struct Client {
 	int basew, baseh, incw, inch, maxw, maxh, minw, minh, hintsvalid;
 	int bw, oldbw;
 	unsigned int tags;
-	int isfixed, isfloating, isurgent, neverfocus, oldstate, isfullscreen;
+	int isfixed, isfloating, isurgent, neverfocus, oldstate, isfullscreen, defmon;
 	Client *next;
 	Client *snext;
 	Monitor *mon;
@@ -215,6 +215,7 @@ static void togglebar(const Arg *arg);
 static void togglefloating(const Arg *arg);
 static void toggletag(const Arg *arg);
 static void toggleview(const Arg *arg);
+static void togglescratch(const Arg *arg);
 static void unfocus(Client *c, int setfocus);
 static void unmanage(Client *c, int destroyed);
 static void unmapnotify(XEvent *e);
@@ -302,6 +303,7 @@ applyrules(Client *c)
 		{
 			c->isfloating = r->isfloating;
 			c->tags |= r->tags;
+			c->defmon = r->monitor;
 			/* if floating is defined:
 			 * only x exceeds 2, only y exceeds 1, both 3, none 0
 			 * exceeds are same if floatx and floaty to set 1 or -1.
@@ -1819,6 +1821,73 @@ toggleview(const Arg *arg)
 		focus(NULL);
 		arrange(selmon);
 	}
+}
+
+void
+togglescratch(const Arg *arg)
+{
+	Client *c, *cnext;
+	char found = 0, notfound = 1;
+	unsigned int visible = 0;
+	Monitor *m = mons, *mnext = m->next, *curmon = selmon;
+	const char *class;
+	XClassHint ch = { NULL, NULL };
+	while (m) {
+		/* ON SELMON AND THERE IS NEXT MONITOR? SKIP */
+		if (m == curmon && mnext) {
+			m = mnext;
+			continue;
+		}
+		for (c = m->clients; c; c = cnext) {
+			/* save next client now to avoid skipping them */
+			cnext = c->next;
+			XGetClassHint(dpy, c->win, &ch);
+			class = ch.res_class ? ch.res_class : broken;
+			found = (char *)((Sp *)arg->v)->class != NULL &&
+				!strcmp(class,(char *)((Sp *)arg->v)->class);
+			/* DO WORK IF FOUND AND KEEP SEARCHING FOR MORE */
+			if (found) {
+				/* not found before check/set visb. for all */
+				if (notfound)
+					visible = ISVISIBLE(c);
+				if (m != curmon) {
+					sendmon(c, curmon);
+					c->tags = curmon->tagset[curmon->seltags];
+					/* failsafe for if mon is not auto */
+					if (c->defmon == -1)
+						applyrules(c);
+				/* HIDE IF ON SAME MONITOR */
+				} else {
+					c->tags = visible ? 1 << 31 :
+					       curmon->tagset[curmon->seltags];
+				}
+				focus(NULL);
+				arrange(curmon);
+				// if not visible, show it
+				if (!visible) {
+					focus(c);
+					restack(curmon);
+					XWarpPointer(dpy, None, c->win, 0, 0,
+						0, 0, c->w/2, c->h/2);
+				}
+				found = notfound = 0;
+			}
+		}
+		/* if found or searched last monitor, selmon, exit */
+		if (!notfound || m == curmon)
+			break;
+		/* SET NEXT MONITOR */
+		if (m->next) {
+			m = m->next;
+			mnext = m->next;
+		} else {
+			m = curmon;
+			mnext = NULL;
+		}
+	}
+	/* spawn if not found on both monitors */
+	if (notfound)
+		spawn(&((Arg){.v = ((Sp *)arg->v)->v}));
 }
 
 void

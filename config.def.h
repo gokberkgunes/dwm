@@ -19,6 +19,18 @@ static const char *colors[][3]      = {
 	[SchemeSel]  = { col_gray4, col_cyan,  col_cyan  },
 };
 
+/* sp_sh should used only if shell is required to spawn the scratchpad */
+#define sp_sh(cmd) .v = (const char*[]){ "/bin/sh", "-c", cmd, NULL }
+#define sp_s1(cmd1) .v = (const char*[]){ cmd1, NULL }
+typedef struct {
+       const char* class;
+       const char* title;
+       const void* v;
+} Sp;
+/* scratchpad definitions */
+const Sp spsignal = { .class = "Signal",     sp_s1("signal-desktop")          };
+const Sp spkpass  = { .class = "KeePassXC",  sp_s1("keepassxc")               };
+const Sp spst     = { .class = "spterm",     sp_sh("st -t '' -c spterm")      };
 /* tagging */
 static const char *tags[] = { "1", "2", "3", "4", "5", "6", "7", "8", "9" };
 
@@ -30,6 +42,9 @@ static const Rule rules[] = {
 	/* class      instance    title       tags mask     isfloating   monitor    float x,y,w,h  */
 	{ "Gimp",     NULL,       NULL,       0,            1,           -1,        50,50,500,500 },
 	{ "firefox",  NULL,       NULL,       1 << 8,       1,           -1,        50,50,500,500 },
+	{ "Signal",      0,          0,            0,       1,           -1,         0,0,0,0      },
+	{ "KeePassXC",   0,          0,            0,       1,           -1,        -1,200,800,500},
+	{ "spterm",      0,          0,            0,       1,           -1,         0,0,500,500  },
 };
 
 /* layout(s) */
@@ -75,6 +90,9 @@ static const Key keys[] = {
 	{ MODKEY,                       XK_Return, zoom,           {0} },
 	{ MODKEY,                       XK_Tab,    view,           {0} },
 	{ MODKEY|ShiftMask,             XK_c,      killclient,     {0} },
+	{ MODKEY,                       XK_e,      togglescratch,  {.v = &spsignal} },
+	{ MODKEY,                       XK_o,      togglescratch,  {.v = &spkpass} },
+	{ MODKEY,                       XK_y,      togglescratch,  {.v = &spst} },
 	{ MODKEY,                       XK_t,      setlayout,      {.v = &layouts[0]} },
 	{ MODKEY,                       XK_f,      setlayout,      {.v = &layouts[1]} },
 	{ MODKEY,                       XK_m,      setlayout,      {.v = &layouts[2]} },
