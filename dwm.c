@@ -1796,6 +1796,7 @@ sigchld(int unused)
 	while (0 < waitpid(-1, NULL, WNOHANG));
 }
 
+void
 sighup(int unused)
 {
 	Arg a = {.i = 1};
