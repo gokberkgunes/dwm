@@ -14,6 +14,12 @@ X11LIB = /usr/X11R6/lib
 XINERAMALIBS  = -lXinerama
 XINERAMAFLAGS = -DXINERAMA
 
+
+# environment color definition (compile-time)
+# https://stackoverflow.com/a/38832692
+COLOR := $(DWM_CLR)
+COLOR := $(if $(COLOR),$(COLOR),#FF0000)
+
 # freetype
 FREETYPELIBS = -lfontconfig -lXft
 FREETYPEINC = /usr/include/freetype2
@@ -27,7 +33,7 @@ INCS = -I${X11INC} -I${FREETYPEINC}
 LIBS = -L${X11LIB} -lX11 ${XINERAMALIBS} ${FREETYPELIBS} -lX11-xcb -lxcb -lxcb-res ${KVMLIB}
 
 # flags
-CPPFLAGS = -D_DEFAULT_SOURCE -D_BSD_SOURCE -D_POSIX_C_SOURCE=200809L -DVERSION=\"${VERSION}\" ${XINERAMAFLAGS}
+CPPFLAGS = -D_DEFAULT_SOURCE -D_BSD_SOURCE -D_POSIX_C_SOURCE=200809L -DVERSION=\"${VERSION}\" ${XINERAMAFLAGS} -DENVCOLOR=\"$(COLOR)\"
 #CFLAGS   = -g -std=c99 -pedantic -Wall -O0 ${INCS} ${CPPFLAGS}
 CFLAGS   = -std=c99 -pedantic -Wall -Wno-deprecated-declarations -Os ${INCS} ${CPPFLAGS}
 LDFLAGS  = ${LIBS}
