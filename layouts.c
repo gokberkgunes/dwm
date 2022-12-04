@@ -23,7 +23,7 @@ mastergrid(Monitor *m) {
 	if (n == 0)
 		return;
 	/* dynamic gapps if there are more than 4 slaves */
-	gap = (n > 4) ? (gappx - (n - 4)) : gappx;
+	gap = (n > 4) ? (gappx - 2*(n - 4)) : gappx;
 	/* vertical monitor, vertically stacked windows */
 	if (m->mh > m->mw)
 		m->nmaster = 0;
