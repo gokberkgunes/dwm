@@ -51,7 +51,7 @@
 #define CLEANMASK(mask)         (mask & ~(numlockmask|LockMask) & (ShiftMask|ControlMask|Mod1Mask|Mod2Mask|Mod3Mask|Mod4Mask|Mod5Mask))
 #define INTERSECT(x,y,w,h,m)    (MAX(0, MIN((x)+(w),(m)->wx+(m)->ww) - MAX((x),(m)->wx)) \
                                * MAX(0, MIN((y)+(h),(m)->wy+(m)->wh) - MAX((y),(m)->wy)))
-#define ISVISIBLE(C)            ((C->tags & C->mon->tagset[C->mon->seltags]))
+#define ISVISIBLE(C)            ((C->tags & C->mon->tagset[C->mon->seltags]) || C->issticky)
 #define LENGTH(X)               (sizeof X / sizeof X[0])
 #define MOUSEMASK               (BUTTONMASK|PointerMotionMask)
 #define WIDTH(X)                ((X)->w + 2 * (X)->bw)
@@ -123,6 +123,7 @@ struct Monitor {
 	int by;               /* bar geometry */
 	int mx, my, mw, mh;   /* screen size */
 	int wx, wy, ww, wh;   /* window area  */
+	int curlaynum;
 	unsigned int seltags;
 	unsigned int sellt;
 	unsigned int tagset[2];
@@ -163,6 +164,7 @@ static void clientmessage(XEvent *e);
 static void configure(Client *c);
 static void configurenotify(XEvent *e);
 static void configurerequest(XEvent *e);
+static void cyclelayout();
 static Monitor *createmon(void);
 static void destroynotify(XEvent *e);
 static void detach(Client *c);
@@ -191,7 +193,6 @@ static void killclient(const Arg *arg);
 static void manage(Window w, XWindowAttributes *wa);
 static void mappingnotify(XEvent *e);
 static void maprequest(XEvent *e);
-static void monocle(Monitor *m);
 static void motionnotify(XEvent *e);
 static void movemouse(const Arg *arg);
 static Client *nexttiled(Client *c);
@@ -222,7 +223,6 @@ static void sigterm(int unused);
 static void spawn(const Arg *arg);
 static void tag(const Arg *arg);
 static void tagmon(const Arg *arg);
-static void tile(Monitor *m);
 static void togglebar(const Arg *arg);
 static void togglefloating(const Arg *arg);
 static void togglescratch(const Arg *arg);
@@ -819,6 +819,15 @@ configurerequest(XEvent *e)
 	XSync(dpy, False);
 }
 
+void
+cyclelayout()
+{
+	/* decrease by length to not exceed. cycle back to start */
+	if (++selmon->curlaynum >= LENGTH(layouts))
+		selmon->curlaynum -= LENGTH(layouts);
+	setlayout(&((Arg) {.v = &layouts[selmon->curlaynum]}));
+}
+
 Monitor *
 createmon(void)
 {
@@ -830,6 +839,7 @@ createmon(void)
 	m->nmaster = nmaster;
 	m->showbar = showbar;
 	m->topbar = topbar;
+	m->curlaynum = 0;
 	m->lt[0] = &layouts[0];
 	m->lt[1] = &layouts[1 % LENGTH(layouts)];
 	strncpy(m->ltsymbol, layouts[0].symbol, sizeof m->ltsymbol);
@@ -1022,7 +1032,7 @@ drawbar(Monitor *m)
 	}
 	x = 0;
 	for (i = 0; i < LENGTH(tags); i++) {
-		/* Do not draw vacant tags */
+		/* do not draw vacant tags */
 		if(!(occ & 1 << i || m->tagset[m->seltags] & 1 << i))
 			continue;
 		w = TEXTW(tags[i]);
@@ -1037,7 +1047,6 @@ drawbar(Monitor *m)
 	if ((w = m->ww - tw - x) > bh) {
 		drw_setscheme(drw, scheme[SchemeNorm]);
 		drw_rect(drw, x, 0, w, bh, 1, 1);
-
 	}
 	drw_map(drw, m->barwin, 0, 0, m->ww, bh);
 }
@@ -1049,16 +1058,6 @@ drawbars(void)
 
 	for (m = mons; m; m = m->next)
 		drawbar(m);
-}
-
-Client *
-findbefore(Client *c)
-{
-	Client *tmp;
-	if (c == selmon->clients)
-		return NULL;
-	for (tmp = selmon->clients; tmp && tmp->next != c; tmp = tmp->next);
-	return tmp;
 }
 
 void
@@ -1091,6 +1090,16 @@ expose(XEvent *e)
 
 	if (ev->count == 0 && (m = wintomon(ev->window)))
 		drawbar(m);
+}
+
+Client *
+findbefore(Client *c)
+{
+	Client *tmp;
+	if (c == selmon->clients)
+		return NULL;
+	for (tmp = selmon->clients; tmp && tmp->next != c; tmp = tmp->next);
+	return tmp;
 }
 
 void
@@ -1141,7 +1150,11 @@ focusmon(const Arg *arg)
 		return;
 	if ((m = dirtomon(arg->i)) == selmon)
 		return;
-	unfocus(selmon->sel, 0);
+	if (selmon->sel) {
+		unfocus(selmon->sel, 0);
+		XSetWindowBorder(dpy, selmon->sel->win,
+		   scheme[SchemeNorm][ColBorder].pixel);
+	}
 	selmon = m;
 	focus(NULL);
 	if (selmon->sel) {
@@ -1448,21 +1461,6 @@ maprequest(XEvent *e)
 		return;
 	if (!wintoclient(ev->window))
 		manage(ev->window, &wa);
-}
-
-void
-monocle(Monitor *m)
-{
-	unsigned int n = 0;
-	Client *c;
-
-	for (c = m->clients; c; c = c->next)
-		if (ISVISIBLE(c))
-			n++;
-	if (n > 0) /* override layout symbol */
-		snprintf(m->ltsymbol, sizeof m->ltsymbol, "[%d]", n);
-	for (c = nexttiled(m->clients); c; c = nexttiled(c->next))
-		resize(c, m->wx, m->wy, m->ww - 2 * c->bw, m->wh - 2 * c->bw, 0);
 }
 
 void
@@ -1857,7 +1855,7 @@ void
 fullscreen(const Arg *arg)
 {
 	if (selmon->showbar) {
-		for(last_layout = (Layout *)layouts; last_layout != selmon->lt[selmon->sellt]; last_layout++);
+		for (last_layout = (Layout *)layouts; last_layout != selmon->lt[selmon->sellt]; last_layout++);
 		setlayout(&((Arg) { .v = &layouts[2] }));
 	} else {
 		setlayout(&((Arg) { .v = last_layout }));
@@ -2071,34 +2069,6 @@ tagmon(const Arg *arg)
 }
 
 void
-tile(Monitor *m)
-{
-	unsigned int i, n, h, mw, my, ty;
-	Client *c;
-
-	for (n = 0, c = nexttiled(m->clients); c; c = nexttiled(c->next), n++);
-	if (n == 0)
-		return;
-
-	if (n > m->nmaster)
-		mw = m->nmaster ? m->ww * m->mfact : 0;
-	else
-		mw = m->ww;
-	for (i = my = ty = 0, c = nexttiled(m->clients); c; c = nexttiled(c->next), i++)
-		if (i < m->nmaster) {
-			h = (m->wh - my) / (MIN(n, m->nmaster) - i);
-			resize(c, m->wx, m->wy + my, mw - (2*c->bw), h - (2*c->bw), 0);
-			if (my + HEIGHT(c) < m->wh)
-				my += HEIGHT(c);
-		} else {
-			h = (m->wh - ty) / (n - i);
-			resize(c, m->wx + mw, m->wy + ty, m->ww - mw - (2*c->bw), h - (2*c->bw), 0);
-			if (ty + HEIGHT(c) < m->wh)
-				ty += HEIGHT(c);
-		}
-}
-
-void
 togglebar(const Arg *arg)
 {
 	selmon->showbar = !selmon->showbar;
@@ -2124,14 +2094,14 @@ togglefloating(const Arg *arg)
 void
 togglescratch(const Arg *arg)
 {
-	Client *c, *cnext;
+	Client *c, *cnext, *cfirst = NULL;
 	char found = 0, notfound = 1;
 	unsigned int visible = 0;
 	Monitor *m = mons, *mnext = m->next, *curmon = selmon;
 	const char *class;
 	XClassHint ch = { NULL, NULL };
 	while (m) {
-		/* ON SELMON AND THERE IS NEXT MONITOR? SKIP */
+		/* skip current monitor, will do it last */
 		if (m == curmon && mnext) {
 			m = mnext;
 			continue;
@@ -2145,36 +2115,46 @@ togglescratch(const Arg *arg)
 				!strcmp(class,(char *)((Sp *)arg->v)->class);
 			/* DO WORK IF FOUND AND KEEP SEARCHING FOR MORE */
 			if (found) {
-				/* not found before check/set visb. for all */
-				if (notfound)
+				//focus(NULL);
+				// if not found before check/set visb. for all
+				if (notfound) {
 					visible = ISVISIBLE(c);
+					cfirst = c;
+					notfound = 0;
+				}
+				/* send to other monitor if not in same mon */
 				if (m != curmon) {
-					sendmon(c, curmon);
+					visible = 0;
+					detach(c);
+					detachstack(c);
+					c->mon = curmon;
 					c->tags = curmon->tagset[curmon->seltags];
-					/* failsafe for if mon is not auto */
-					if (c->defmon == -1)
-						applyrules(c);
-				/* HIDE IF ON SAME MONITOR */
-				} else {
-					c->tags = visible ? 1 << 31 :
-					       curmon->tagset[curmon->seltags];
-				}
-				focus(NULL);
-				arrange(curmon);
-				// if not visible, show it
-				if (!visible) {
-					focus(c);
-					restack(curmon);
-					XWarpPointer(dpy, None, c->win, 0, 0,
-						0, 0, c->w/2, c->h/2);
-				}
-				found = notfound = 0;
+					attach(c);
+					attachstack(c);
+					/* apply rules for specified client */
+					applyrules(c);
+				/* hide if on same monitor */
+				} else
+					c->tags = visible ? 1 << 31 : curmon->tagset[curmon->seltags];
 			}
 		}
-		/* if found or searched last monitor, selmon, exit */
-		if (!notfound || m == curmon)
-			break;
-		/* SET NEXT MONITOR */
+		/* found or searched last monitor:selmon, redraw>focus>exit */
+		if (!notfound || m == curmon) {
+			arrange(m); /* Arrange the monitor we leave. */
+			focus(cfirst);
+			arrange(curmon); /* Arrange the destination monitor. */
+			/* if showing client focus on them with pointer */
+			if (!visible && cfirst)
+				XWarpPointer(dpy, None, cfirst->win, 0, 0, 0, 0, cfirst->w/2, cfirst->h/2);
+			/* if hiding client focus on remainder client */
+			else if (selmon->sel)
+				XWarpPointer(dpy, None, selmon->sel->win, 0, 0, 0, 0, selmon->sel->w/2, selmon->sel->h/2);
+			/* if hiding clients and nothing else left go mid */
+			else
+				XWarpPointer(dpy, None, m->barwin, 0, 0, 0, 0, m->mw/2, m->mh/2);
+			break; /* exit: found or no monitor */
+		}
+		/* set next monitor */
 		if (m->next) {
 			m = m->next;
 			mnext = m->next;
@@ -2186,6 +2166,14 @@ togglescratch(const Arg *arg)
 	/* spawn if not found on both monitors */
 	if (notfound)
 		spawn(&((Arg){.v = ((Sp *)arg->v)->v}));
+	/* NOTE: If you want to dig deeper, you may set a global client that
+	 * saves active window before the hiding process. Then during the
+	 * unhiding process focus on this old-active window. Implementation is
+	 * cumbersome and there are multiple scratchpads, probably function
+	 * inputs should increase for this to work. New input should be
+	 * location of saved window in the global Client array. When defining
+	 * keybindings one must give this integer.
+	 */
 }
 
 void
@@ -2274,7 +2262,6 @@ unmanage(Client *c, int destroyed)
 	if (lastfocused == c)
 		lastfocused = NULL;
 	free(c);
-
 	if (!s) {
 		arrange(m);
 		focus(NULL);
