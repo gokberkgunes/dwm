@@ -1152,8 +1152,7 @@ focusmon(const Arg *arg)
 		return;
 	if (selmon->sel) {
 		unfocus(selmon->sel, 0);
-		XSetWindowBorder(dpy, selmon->sel->win,
-		   scheme[SchemeNorm][ColBorder].pixel);
+		XSetWindowBorder(dpy, selmon->sel->win, scheme[SchemeNorm][ColBorder].pixel);
 	}
 	selmon = m;
 	focus(NULL);
@@ -1474,6 +1473,8 @@ motionnotify(XEvent *e)
 	if (ev->window != root)
 		return;
 	if ((m = recttomon(ev->x_root, ev->y_root, 1, 1)) != mon && mon) {
+		if (selmon->sel)
+			XSetWindowBorder(dpy, selmon->sel->win, scheme[SchemeNorm][ColBorder].pixel);
 		unfocus(selmon->sel, 1);
 		selmon = m;
 		focus(NULL);
