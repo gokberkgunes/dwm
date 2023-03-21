@@ -35,7 +35,7 @@ const Sp sptabbed = { .class = "tabbed" };
 const Sp spsteam  = { .class = "Steam", sp_s1("steam") };
 const Sp spmpv    = { .class = "mpv" };
 const Sp spftube  = { .class = "FreeTube", sp_s1("freetube") };
-const Sp spcalc   = { .class = "spcalc", sp_sh("st -c spcalc bc -lq") };
+const Sp spcalc   = { .class = "spcalc", sp_sh("st -c spcalc calc -d0") };
 const Sp spmusc   = { .class = "spmusc", sp_sh("st -c spmusc ncmpcpp") };
 
 static const char *tags[] = { "1", "2", "3", "4", "5", "6", "7" };
