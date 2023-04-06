@@ -1,0 +1,171 @@
+From: gg
+Subject: Toggleable Multiple Multi Monitor Scratchpads
+
+Better to be applied after float rules patch.
+Hides and shows every matching scratchpad.
+Moves every matching scratchpad to required monitor.
+
+diff --git a/config.def.h b/config.def.h
+index a12b621..2bdb0f0 100644
+--- a/config.def.h
++++ b/config.def.h
+@@ -19,6 +19,18 @@ static const char *colors[][3]      = {
+ 	[SchemeSel]  = { col_gray4, col_cyan,  col_cyan  },
+ };
+
++/* sp_sh should used only if shell is required to spawn the scratchpad */
++#define sp_sh(cmd) .v = (const char*[]){ "/bin/sh", "-c", cmd, NULL }
++#define sp_s1(cmd1) .v = (const char*[]){ cmd1, NULL }
++typedef struct {
++       const char* class;
++       const char* title;
++       const void* v;
++} Sp;
++/* scratchpad definitions */
++const Sp spsignal = { .class = "Signal",     sp_s1("signal-desktop")          };
++const Sp spkpass  = { .class = "KeePassXC",  sp_s1("keepassxc")               };
++const Sp spst     = { .class = "spterm",     sp_sh("st -t '' -c spterm")      };
+ /* tagging */
+ static const char *tags[] = { "1", "2", "3", "4", "5", "6", "7", "8", "9" };
+
+@@ -30,6 +42,9 @@ static const Rule rules[] = {
+ 	/* class      instance    title       tags mask     isfloating   monitor    float x,y,w,h  */
+ 	{ "Gimp",     NULL,       NULL,       0,            1,           -1,        50,50,500,500 },
+ 	{ "firefox",  NULL,       NULL,       1 << 8,       1,           -1,        50,50,500,500 },
++	{ "Signal",      0,          0,            0,       1,           -1,         0,0,0,0      },
++	{ "KeePassXC",   0,          0,            0,       1,           -1,        -1,200,800,500},
++	{ "spterm",      0,          0,            0,       1,           -1,         0,0,500,500  },
+ };
+
+ /* layout(s) */
+@@ -75,6 +90,9 @@ static const Key keys[] = {
+ 	{ MODKEY,                       XK_Return, zoom,           {0} },
+ 	{ MODKEY,                       XK_Tab,    view,           {0} },
+ 	{ MODKEY|ShiftMask,             XK_c,      killclient,     {0} },
++	{ MODKEY,                       XK_e,      togglescratch,  {.v = &spsignal} },
++	{ MODKEY,                       XK_o,      togglescratch,  {.v = &spkpass} },
++	{ MODKEY,                       XK_y,      togglescratch,  {.v = &spst} },
+ 	{ MODKEY,                       XK_t,      setlayout,      {.v = &layouts[0]} },
+ 	{ MODKEY,                       XK_f,      setlayout,      {.v = &layouts[1]} },
+ 	{ MODKEY,                       XK_m,      setlayout,      {.v = &layouts[2]} },
+diff --git a/dwm.c b/dwm.c
+index 3cc5b6c..f7a4eed 100644
+--- a/dwm.c
++++ b/dwm.c
+@@ -92,7 +92,7 @@ struct Client {
+ 	int basew, baseh, incw, inch, maxw, maxh, minw, minh, hintsvalid;
+ 	int bw, oldbw;
+ 	unsigned int tags;
+-	int isfixed, isfloating, isurgent, neverfocus, oldstate, isfullscreen;
++	int isfixed, isfloating, isurgent, neverfocus, oldstate, isfullscreen, defmon;
+ 	Client *next;
+ 	Client *snext;
+ 	Monitor *mon;
+@@ -215,6 +215,7 @@ static void togglebar(const Arg *arg);
+ static void togglefloating(const Arg *arg);
+ static void toggletag(const Arg *arg);
+ static void toggleview(const Arg *arg);
++static void togglescratch(const Arg *arg);
+ static void unfocus(Client *c, int setfocus);
+ static void unmanage(Client *c, int destroyed);
+ static void unmapnotify(XEvent *e);
+@@ -301,6 +302,7 @@ applyrules(Client *c)
+ 		{
+ 			c->isfloating = r->isfloating;
+ 			c->tags |= r->tags;
++			c->defmon = r->monitor;
+ 			/* if floating is defined:
+ 			 * only x exceeds 2, only y exceeds 1, both 3, none 0
+ 			 * exceeds are same if floatx and floaty to set 1 or -1.
+@@ -1819,6 +1821,91 @@ toggleview(const Arg *arg)
+ 	}
+ }
+
++void
++togglescratch(const Arg *arg)
++{
++	Client *c, *cnext, *cfirst = NULL;
++	char found = 0, notfound = 1;
++	unsigned int visible = 0;
++	Monitor *m = mons, *mnext = m->next, *curmon = selmon;
++	const char *class;
++	XClassHint ch = { NULL, NULL };
++	while (m) {
++		/* skip current monitor, will do it last */
++		if (m == curmon && mnext) {
++			m = mnext;
++			continue;
++		}
++		for (c = m->clients; c; c = cnext) {
++			/* save next client now to avoid skipping them */
++			cnext = c->next;
++			XGetClassHint(dpy, c->win, &ch);
++			class = ch.res_class ? ch.res_class : broken;
++			found = (char *)((Sp *)arg->v)->class != NULL &&
++				!strcmp(class,(char *)((Sp *)arg->v)->class);
++			/* DO WORK IF FOUND AND KEEP SEARCHING FOR MORE */
++			if (found) {
++				//focus(NULL);
++				// if not found before check/set visb. for all
++				if (notfound) {
++					visible = ISVISIBLE(c);
++					cfirst = c;
++					notfound = 0;
++				}
++				/* send to other monitor if not in same mon */
++				if (m != curmon) {
++					visible = 0;
++					detach(c);
++					detachstack(c);
++					c->mon = curmon;
++					c->tags = curmon->tagset[curmon->seltags];
++					attach(c);
++					attachstack(c);
++					/* apply rules for specified client */
++					applyrules(c);
++				/* hide if on same monitor */
++				} else
++					c->tags = visible ? 1 << 31 : curmon->tagset[curmon->seltags];
++			}
++		}
++		/* found or searched last monitor:selmon, redraw>focus>exit */
++		if (!notfound || m == curmon) {
++			arrange(m); /* Arrange the monitor we leave. */
++			focus(cfirst);
++			arrange(curmon); /* Arrange the destination monitor. */
++			/* if showing client focus on them with pointer */
++			if (!visible && cfirst)
++				XWarpPointer(dpy, None, cfirst->win, 0, 0, 0, 0, cfirst->w/2, cfirst->h/2);
++			/* if hiding client focus on remainder client */
++			else if (selmon->sel)
++				XWarpPointer(dpy, None, selmon->sel->win, 0, 0, 0, 0, selmon->sel->w/2, selmon->sel->h/2);
++			/* if hiding clients and nothing else left go mid */
++			else
++				XWarpPointer(dpy, None, m->barwin, 0, 0, 0, 0, m->mw/2, m->mh/2);
++			break; /* exit: found or no monitor */
++		}
++		/* set next monitor */
++		if (m->next) {
++			m = m->next;
++			mnext = m->next;
++		} else {
++			m = curmon;
++			mnext = NULL;
++		}
++	}
++	/* spawn if not found on both monitors */
++	if (notfound)
++		spawn(&((Arg){.v = ((Sp *)arg->v)->v}));
++	/* NOTE: If you want to dig deeper, you may set a global client that
++	 * saves active window before the hiding process. Then during the
++	 * unhiding process focus on this old-active window. Implementation is
++	 * cumbersome and there are multiple scratchpads, probably function
++	 * inputs should increase for this to work. New input should be
++	 * location of saved window in the global Client array. When defining
++	 * keybindings one must give this integer.
++	 */
++}
++
+ void
+ unfocus(Client *c, int setfocus)
+ {

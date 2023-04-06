@@ -1,0 +1,18 @@
+From: gg
+Subject: This patch removes the variables which are leftover after applying
+hide vacant tags patch.
+
+---
+diff --git a/dwm.c b/dwm.c
+index f520a05..9cf5710 100644
+--- a/dwm.c
++++ b/dwm.c
+@@ -959,8 +959,6 @@ void
+ drawbar(Monitor *m)
+ {
+ 	int x, w, tw = 0;
+-	int boxs = drw->fonts->h / 9;
+-	int boxw = drw->fonts->h / 6 + 2;
+ 	unsigned int i, occ = 0, urg = 0;
+ 	Client *c;
+

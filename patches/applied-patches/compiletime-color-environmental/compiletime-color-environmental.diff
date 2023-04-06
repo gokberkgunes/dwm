@@ -1,0 +1,46 @@
+From: gg
+Subject: This patch enables user to specify an environmental variable as
+$DWM_CLR. This variable is passed to dwm in compile-time to be used.
+
+---
+diff --git a/src/dwm/config.h b/src/dwm/config.h
+index 2d538a1..0c01a1e 100644
+--- a/src/dwm/config.h
++++ b/src/dwm/config.h
+@@ -9,9 +9,9 @@ static const char *fonts[]	   = { "Gohu GohuFont:pixelsize=11",
+ static const char nor_bg_clr[]	   = "#000000";
+ static const char nor_fg_clr[]	   = "#aaaaaa";
+ static const char nor_edge_clr[]   = "#000000"; // non-selected edge
+-static const char sel_bg_clr[]	   = "#b2f66f"; // selected tab background
++static const char sel_bg_clr[]	   =  ENVCOLOR; // selected tab background
+ static const char sel_fg_clr[]	   = "#929292";
+-static const char sel_edge_clr[]   = "#b2f66f";
++static const char sel_edge_clr[]   =  ENVCOLOR;
+ static const char *colors[][3]	   = {
+ 	/*               fg          bg          edge */
+ 	[SchemeNorm] = { nor_fg_clr, nor_bg_clr, nor_edge_clr },
+diff --git a/src/dwm/makeconfig.mk b/src/dwm/makeconfig.mk
+index 1cca0de..a44685c 100644
+--- a/src/dwm/makeconfig.mk
++++ b/src/dwm/makeconfig.mk
+@@ -14,11 +14,6 @@ X11LIB = /usr/X11R6/lib
+ XINERAMALIBS  = -lXinerama
+ XINERAMAFLAGS = -DXINERAMA
+
++# environment color definition (compile-time)
++# https://stackoverflow.com/a/38832692
++COLOR := $(DWM_CLR)
++COLOR := $(if $(COLOR),$(COLOR),#FF0000)
++
+ #CFLAGS += $(shell pkg-config --cflags libusb-1.0)
+ # freetype
+ FREETYPELIBS = -lfontconfig -lXft
+@@ -31,7 +26,7 @@ INCS = -I${X11INC} -I${FREETYPEINC}
+ LIBS = -L${X11LIB} -lX11 ${XINERAMALIBS} ${FREETYPELIBS} -lX11-xcb -lxcb -lxcb-res
+
+ # flags
+-CPPFLAGS = -D_DEFAULT_SOURCE -D_BSD_SOURCE -D_POSIX_C_SOURCE=200809L -DVERSION=\"${VERSION}\" ${XINERAMAFLAGS}
++CPPFLAGS = -D_DEFAULT_SOURCE -D_BSD_SOURCE -D_POSIX_C_SOURCE=200809L -DVERSION=\"${VERSION}\" ${XINERAMAFLAGS} -DENVCOLOR=\"$(COLOR)\"
+ #CFLAGS   = -g -std=c99 -pedantic -Wall -O0 ${INCS} ${CPPFLAGS}
+ CFLAGS   = -pedantic -Wall -Wno-deprecated-declarations -Os ${INCS} ${CPPFLAGS}
+ LDFLAGS  = ${LIBS}

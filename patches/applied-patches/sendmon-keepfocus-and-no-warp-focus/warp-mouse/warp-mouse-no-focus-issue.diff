@@ -1,0 +1,68 @@
+From: gg
+Subject: This patch enables warping mouse to switched and spawned clients
+without focusing overlapped window due to movement of the mouse.
+
+diff --git a/dwm.c b/dwm.c
+index 3876353..33d5329 100644
+--- a/dwm.c
++++ b/dwm.c
+@@ -263,6 +263,7 @@ static void (*handler[LASTEvent]) (XEvent *) = {
+ };
+ static Atom wmatom[WMLast], netatom[NetLast];
+ static int running = 1;
++static int iswarp = 0;
+ static Cur *cursor[CurLast];
+ static Clr **scheme;
+ static Display *dpy;
+@@ -845,9 +846,12 @@ enternotify(XEvent *e)
+ 	if (m != selmon) {
+ 		unfocus(selmon->sel, 1);
+ 		selmon = m;
++		focus(c); /* fixes focus by mouse coming from other monitor */
+ 	} else if (!c || c == selmon->sel)
+ 		return;
+-	focus(c);
++	if (!iswarp)
++		focus(c);
++	iswarp = 0; /* reset so that swapping monitors are not buggy */
+ }
+
+ void
+@@ -907,6 +911,13 @@ focusmon(const Arg *arg)
+ 	unfocus(selmon->sel, 0);
+ 	selmon = m;
+ 	focus(NULL);
++	if (selmon->sel) {
++		XWarpPointer(dpy, None, selmon->sel->win, 0, 0, 0, 0, selmon->sel->w/2, selmon->sel->h/2);
++		iswarp = 1;
++		return;
++	}
++	/* Move to other monitor's center if there is nothing to focus */
++	XWarpPointer(dpy, None, m->barwin, 0, 0, 0, 0, m->mw / 2, m->mh / 2);
+ }
+
+ void
+@@ -930,6 +941,7 @@ focusstack(const Arg *arg)
+ 					c = i;
+ 	}
+ 	if (c) {
++		XWarpPointer(dpy, None, c->win, 0, 0, 0, 0, c->w/2, c->h/2);
+ 		focus(c);
+ 		restack(selmon);
+ 	}
+@@ -1196,6 +1208,7 @@ motionnotify(XEvent *e)
+ 	Monitor *m;
+ 	XMotionEvent *ev = &e->xmotion;
+
++	iswarp = 0; /* set warp to 0 cause mouse motion is not a warping */
+ 	if (ev->window != root)
+ 		return;
+ 	if ((m = recttomon(ev->x_root, ev->y_root, 1, 1)) != mon && mon) {
+@@ -1497,6 +1510,7 @@ sendmon(Client *c, Monitor *m)
+ 	attachstack(c);
+ 	arrange(m);
+ 	if (hadfocus) {
++		XWarpPointer(dpy, None, c->win, 0, 0, 0, 0, c->w/2, c->h/2);
+ 		focus(c);
+ 		restack(m);
+ 	} else

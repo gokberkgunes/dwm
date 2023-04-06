@@ -1,0 +1,38 @@
+This patch reduces the the flicker when a new window spawned and killed.
+
+Ref.
+https://www.reddit.com/r/suckless/comments/ndudaq/
+
+---
+
+diff --git a/dwm.c b/dwm.c
+index 253aba7..0474d62 100644
+--- a/dwm.c
++++ b/dwm.c
+@@ -1012,6 +1012,13 @@ killclient(const Arg *arg)
+ 		XGrabServer(dpy);
+ 		XSetErrorHandler(xerrordummy);
+ 		XSetCloseDownMode(dpy, DestroyAll);
++
++		/* Detach the client to avoid blinking/flickering. */
++		detach(selmon->sel);
++		detachstack(selmon->sel);
++		arrangemon(selmon);
++		drawbar(selmon);
++
+ 		XKillClient(dpy, selmon->sel->win);
+ 		XSync(dpy, False);
+ 		XSetErrorHandler(xerror);
+@@ -1074,8 +1083,11 @@ manage(Window w, XWindowAttributes *wa)
+ 	if (c->mon == selmon)
+ 		unfocus(selmon->sel, 0);
+ 	c->mon->sel = c;
+-	arrange(c->mon);
++
+ 	XMapWindow(dpy, c->win);
++	/* Arrange after mapping the window to reduce flicker on new clients */
++	arrange(c->mon);
++
+ 	focus(NULL);
+ }
+

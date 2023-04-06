@@ -1,0 +1,21 @@
+From: gg
+Subject: fixes mouse warp focus problem. Apply after sendmon-keepfocus.
+
+diff --git a/dwm.c b/dwm.c
+index 4465af1..2def4a1 100644
+--- a/dwm.c
++++ b/dwm.c
+@@ -520,8 +521,11 @@ buttonpress(XEvent *e)
+ 		else
+ 			click = ClkWinTitle;
+ 	} else if ((c = wintoclient(ev->window))) {
+-		focus(c);
+-		restack(selmon);
++		if (!iswarp) { /* Not sure if needed. */
++			iswarp = 0;
++			focus(c);
++			restack(selmon);
++		}
+ 		XAllowEvents(dpy, ReplayPointer, CurrentTime);
+ 		click = ClkClientWin;
+ 	}

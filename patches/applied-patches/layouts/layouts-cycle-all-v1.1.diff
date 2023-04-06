@@ -1,0 +1,368 @@
+From: gg
+Subject: This patch introduces two new features to dwm. First feature is
+a function to allow cycling layouts; the second trait is combining all layouts
+and some new new layouts into a new file.
+
+ config.def.h |  13 ++--
+ dwm.c        |  56 ++++-------------
+ layouts.c    | 193 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 210 insertions(+), 52 deletions(-)
+
+diff --git a/config.def.h b/config.def.h
+index 9efa774..c136d7f 100644
+--- a/config.def.h
++++ b/config.def.h
+@@ -37,11 +37,12 @@ static const int nmaster     = 1;    /* number of clients in master area */
+ static const int resizehints = 1;    /* 1 means respect size hints in tiled resizals */
+ static const int lockfullscreen = 1; /* 1 will force focus on the fullscreen window */
+
++#include "layouts.c"
+ static const Layout layouts[] = {
+ 	/* symbol     arrange function */
+-	{ "[]=",      tile },    /* first entry is default */
+-	{ "><>",      NULL },    /* no layout function means floating behavior */
++	{ "[]#",      mastergrid }, /* first entry is default */
+ 	{ "[M]",      monocle },
++	{ "###",      gaplessgrid },
+ };
+
+ /* key definitions */
+@@ -74,10 +75,7 @@ static const Key keys[] = {
+ 	{ MODKEY,                       XK_Return, zoom,           {0} },
+ 	{ MODKEY,                       XK_Tab,    view,           {0} },
+ 	{ MODKEY|ShiftMask,             XK_c,      killclient,     {0} },
+-	{ MODKEY,                       XK_t,      setlayout,      {.v = &layouts[0]} },
+-	{ MODKEY,                       XK_f,      setlayout,      {.v = &layouts[1]} },
+-	{ MODKEY,                       XK_m,      setlayout,      {.v = &layouts[2]} },
+-	{ MODKEY,                       XK_space,  setlayout,      {0} },
++	{ MODKEY,                       XK_space,  cyclelayout,    {0} },
+ 	{ MODKEY|ShiftMask,             XK_space,  togglefloating, {0} },
+ 	{ MODKEY,                       XK_0,      view,           {.ui = ~0 } },
+ 	{ MODKEY|ShiftMask,             XK_0,      tag,            {.ui = ~0 } },
+@@ -101,8 +99,7 @@ static const Key keys[] = {
+ /* click can be ClkTagBar, ClkLtSymbol, ClkStatusText, ClkWinTitle, ClkClientWin, or ClkRootWin */
+ static const Button buttons[] = {
+ 	/* click                event mask      button          function        argument */
+-	{ ClkLtSymbol,          0,              Button1,        setlayout,      {0} },
+-	{ ClkLtSymbol,          0,              Button3,        setlayout,      {.v = &layouts[2]} },
++	{ ClkLtSymbol,          0,              Button1,        cyclelayout,    {0} },
+ 	{ ClkWinTitle,          0,              Button2,        zoom,           {0} },
+ 	{ ClkStatusText,        0,              Button2,        spawn,          {.v = termcmd } },
+ 	{ ClkClientWin,         MODKEY,         Button1,        movemouse,      {0} },
+diff --git a/dwm.c b/dwm.c
+index 253aba7..9b2a085 100644
+--- a/dwm.c
++++ b/dwm.c
+@@ -119,6 +119,7 @@ struct Monitor {
+ 	int by;               /* bar geometry */
+ 	int mx, my, mw, mh;   /* screen size */
+ 	int wx, wy, ww, wh;   /* window area  */
++	int curlaynum;
+ 	unsigned int seltags;
+ 	unsigned int sellt;
+ 	unsigned int tagset[2];
+@@ -156,6 +157,7 @@ static void clientmessage(XEvent *e);
+ static void configure(Client *c);
+ static void configurenotify(XEvent *e);
+ static void configurerequest(XEvent *e);
++static void cyclelayout();
+ static Monitor *createmon(void);
+ static void destroynotify(XEvent *e);
+ static void detach(Client *c);
+@@ -181,7 +183,6 @@ static void killclient(const Arg *arg);
+ static void manage(Window w, XWindowAttributes *wa);
+ static void mappingnotify(XEvent *e);
+ static void maprequest(XEvent *e);
+-static void monocle(Monitor *m);
+ static void motionnotify(XEvent *e);
+ static void movemouse(const Arg *arg);
+ static Client *nexttiled(Client *c);
+@@ -209,7 +210,6 @@ static void sigchld(int unused);
+ static void spawn(const Arg *arg);
+ static void tag(const Arg *arg);
+ static void tagmon(const Arg *arg);
+-static void tile(Monitor *m);
+ static void togglebar(const Arg *arg);
+ static void togglefloating(const Arg *arg);
+ static void toggletag(const Arg *arg);
+@@ -631,6 +631,15 @@ configurerequest(XEvent *e)
+ 	XSync(dpy, False);
+ }
+
++void
++cyclelayout()
++{
++	/* decrease by length to not exceed. cycle back to start */
++	if (++selmon->curlaynum >= LENGTH(layouts))
++		selmon->curlaynum -= LENGTH(layouts);
++	setlayout(&((Arg) {.v = &layouts[selmon->curlaynum]}));
++}
++
+ Monitor *
+ createmon(void)
+ {
+@@ -642,6 +651,7 @@ createmon(void)
+ 	m->nmaster = nmaster;
+ 	m->showbar = showbar;
+ 	m->topbar = topbar;
++	m->curlaynum = 0;
+ 	m->lt[0] = &layouts[0];
+ 	m->lt[1] = &layouts[1 % LENGTH(layouts)];
+ 	strncpy(m->ltsymbol, layouts[0].symbol, sizeof m->ltsymbol);
+@@ -1101,20 +1111,6 @@ maprequest(XEvent *e)
+ 		manage(ev->window, &wa);
+ }
+
+-void
+-monocle(Monitor *m)
+-{
+-	unsigned int n = 0;
+-	Client *c;
+-
+-	for (c = m->clients; c; c = c->next)
+-		if (ISVISIBLE(c))
+-			n++;
+-	if (n > 0) /* override layout symbol */
+-		snprintf(m->ltsymbol, sizeof m->ltsymbol, "[%d]", n);
+-	for (c = nexttiled(m->clients); c; c = nexttiled(c->next))
+-		resize(c, m->wx, m->wy, m->ww - 2 * c->bw, m->wh - 2 * c->bw, 0);
+-}
+
+ void
+ motionnotify(XEvent *e)
+@@ -1668,34 +1664,6 @@ tagmon(const Arg *arg)
+ 	sendmon(selmon->sel, dirtomon(arg->i));
+ }
+
+-void
+-tile(Monitor *m)
+-{
+-	unsigned int i, n, h, mw, my, ty;
+-	Client *c;
+-
+-	for (n = 0, c = nexttiled(m->clients); c; c = nexttiled(c->next), n++);
+-	if (n == 0)
+-		return;
+-
+-	if (n > m->nmaster)
+-		mw = m->nmaster ? m->ww * m->mfact : 0;
+-	else
+-		mw = m->ww;
+-	for (i = my = ty = 0, c = nexttiled(m->clients); c; c = nexttiled(c->next), i++)
+-		if (i < m->nmaster) {
+-			h = (m->wh - my) / (MIN(n, m->nmaster) - i);
+-			resize(c, m->wx, m->wy + my, mw - (2*c->bw), h - (2*c->bw), 0);
+-			if (my + HEIGHT(c) < m->wh)
+-				my += HEIGHT(c);
+-		} else {
+-			h = (m->wh - ty) / (n - i);
+-			resize(c, m->wx + mw, m->wy + ty, m->ww - mw - (2*c->bw), h - (2*c->bw), 0);
+-			if (ty + HEIGHT(c) < m->wh)
+-				ty += HEIGHT(c);
+-		}
+-}
+-
+ void
+ togglebar(const Arg *arg)
+ {
+diff --git a/layouts.c b/layouts.c
+new file mode 100644
+index 0000000..6b248f4
+--- /dev/null
++++ b/layouts.c
+@@ -0,0 +1,195 @@
++static void
++monocle(Monitor *m)
++{
++	unsigned int n = 0;
++	Client *c;
++
++	for (c = m->clients; c; c = c->next)
++		if (ISVISIBLE(c))
++			n++;
++	if (n > 0) /* override layout symbol */
++		snprintf(m->ltsymbol, sizeof m->ltsymbol, "[%d]", n);
++	for (c = nexttiled(m->clients); c; c = nexttiled(c->next))
++		resize(c, m->wx, m->wy, m->ww - 2 * c->bw, m->wh - 2 * c->bw, 0);
++}
++
++static void
++mastergrid(Monitor *m) {
++	int i, gap;
++	unsigned int n, cols, rows, cn, rn, cx, cy, cw, ch, mw, mh, my;
++	Client *c;
++
++	for (n = 0, c = nexttiled(m->clients); c; c = nexttiled(c->next), n++);
++	if (n == 0)
++		return;
++	/* dynamic gapps if there are more than 4 slaves */
++	gap = (n > 4) ? (gappx - (n - 4)) : gappx;
++	/* If gap is negative force it to 0 */
++	gap = (gap < 0) ? 0 : gap;
++	/* vertical monitor, vertically stacked windows */
++	if (m->mh > m->mw)
++		m->nmaster = 0;
++
++	/* if one window or nmaster 0 then full width master window */
++	if (n <= 1 || m->nmaster == 0) {
++		mw = m->ww;
++
++	/* scaled master window */
++	} else {
++		/* scale master window's width */
++		mw = m->ww*m->mfact;
++		/* ignore master window's count to calculate slave grids */
++		n--;
++	}
++	/* Calculate how many rows required */
++	for (rows = 0; rows*rows < n; rows++);
++	/* set tiling layout until we have more than 3 slaves */
++	if (n == 3)
++		rows = 3;
++
++	cols = n/rows;
++	/* window geometries */
++	ch = rows ? (m->wh-gap) / rows : m->wh;
++	cn = 0; /* current column number */
++	rn = 0; /* current row number */
++	my = gap; /* master y coord. */
++	for (i = -1, c = nexttiled(m->clients); c; i++, c = nexttiled(c->next)) {
++		if (i == -1 || m->nmaster == 0) {
++			mh = (m->wh - my) / ((m->nmaster ? 1 : n) - i - 1);
++			resize(c, m->wx + gap, m->wy + my,
++				mw - 2*c->bw - 2*gap, mh - 2*c->bw - gap,0);
++			my += HEIGHT(c) + gap;
++			continue;
++		}
++		if (i/cols + 1 > rows - n%rows)
++			cols = n/rows + 1;
++		cw = cols ? (m->ww - mw)/cols : (m->ww - mw) - gap;
++		cx = m->wx + cn*cw + mw;
++		cy = m->wy + rn*ch;
++		resize(c, cx, cy + gap, cw - 2*c->bw - gap,
++			ch - 2*c->bw - gap, 0);
++		cn++;
++		if (cn >= cols) {
++			cn = 0;
++			rn++;
++		}
++	}
++}
++
++/* There is gappx implemented by gg. Rest is gappless grid patch. */
++static void
++gapfulgrid(Monitor *m) {
++	unsigned int n, cols, rows, cn, rn, i, cx, cy, cw, ch;
++	Client *c;
++
++	for(n = 0, c = nexttiled(m->clients); c; c = nexttiled(c->next), n++) ;
++	if(n == 0)
++		return;
++
++	/* grid dimensions */
++	for (cols = 0; cols*cols < n; cols++);
++	rows = n/cols;
++
++	/* window geometries */
++	cw = cols ? (m->ww-gappx) / cols : m->ww;
++	cn = 0; /* current column number */
++	rn = 0; /* current row number */
++	for(i = 0, c = nexttiled(m->clients); c; i++, c = nexttiled(c->next)) {
++		if(i/rows + 1 > cols - n%cols)
++			rows = n/cols + 1;
++		ch = rows ? (m->wh-gappx) / rows : m->wh;
++		cx = m->wx + cn*cw;
++		cy = m->wy + rn*ch;
++		resize(c,
++			cx + gappx,
++			cy + gappx,
++			cw - 2 * c->bw - gappx,
++			ch - 2 * c->bw - gappx,
++			False);
++		rn++;
++		if(rn >= rows) {
++			rn = 0;
++			cn++;
++		}
++	}
++}
++
++#ifdef extra_layouts
++
++static void
++vertmastergrid(Monitor *m) {
++	int i;
++	unsigned int n, cols, rows, cn, rn, cx, cy, cw, ch, mw;
++	Client *c;
++
++	for (n = 0, c = nexttiled(m->clients); c; c = nexttiled(c->next), n++) ;
++	if (n == 0)
++		return;
++
++	if (n > 1) {
++		/* scale master window's width */
++		mw = m->ww * m->mfact;
++		/* reduce number windows for calculating slave grids */
++		n--;
++	} else
++		mw = m->ww;
++	/* Calculate how many columns are required */
++	for (cols = 0; cols*cols < n; cols++);
++	rows = n/cols;
++	/* window geometries */
++	cw = cols ? (m->ww - mw) / cols : (m->ww - mw);
++	cn = 0; /* current column number */
++	rn = 0; /* current row number */
++	for (i = -1, c = nexttiled(m->clients); c; i++, c = nexttiled(c->next)) {
++		if (i == -1) { //< m->nmaster) {
++			cy = 0; //gappx;
++			resize(c,
++				m->wx, //+ gappx,
++				m->wy + cy,
++				mw - (2*c->bw),// - 2*gappx,
++				m->wh - cy - (2*c->bw), //- gappx,
++				0);
++			continue;
++		}
++		if (i/rows + 1 > cols - n%cols)
++			rows = n/cols + 1;
++		ch = rows ? m->wh / rows : m->wh;
++		cx = m->wx + cn*cw + mw;
++		cy = m->wy + rn*ch;
++		resize(c, cx, cy, cw - 2 * c->bw, ch - 2 * c->bw, False);
++		rn++;
++		if (rn >= rows) {
++			rn = 0;
++			cn++;
++		}
++	}
++}
++
++static void
++tile(Monitor *m)
++{
++	unsigned int i, n, h, mw, my, ty;
++	Client *c;
++
++	for (n = 0, c = nexttiled(m->clients); c; c = nexttiled(c->next), n++);
++	if (n == 0)
++		return;
++
++	if (n > m->nmaster)
++		mw = m->nmaster ? m->ww * m->mfact : gappx;
++	else
++		mw = m->ww;
++	for (i = 0, my = ty = gappx, c = nexttiled(m->clients); c; c = nexttiled(c->next), i++)
++		if (i < m->nmaster) {
++			h = (m->wh - my) / (MIN(n, m->nmaster) - i) - gappx;
++			resize(c, m->wx + gappx, m->wy + my, mw - (2*c->bw) - 2*gappx, h - (2*c->bw), 0);
++			if (my + HEIGHT(c) < m->wh)
++				my += HEIGHT(c) + gappx;
++		} else {
++			h = (m->wh - ty) / (n - i) - gappx;
++			resize(c, m->wx + mw, m->wy + ty, m->ww - mw - (2*c->bw) - gappx, h - (2*c->bw), 0);
++			if (ty + HEIGHT(c) < m->wh)
++				ty += HEIGHT(c) + gappx;
++		}
++}
++#endif

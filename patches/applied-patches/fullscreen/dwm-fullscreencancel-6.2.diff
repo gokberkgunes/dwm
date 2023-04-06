@@ -1,0 +1,17 @@
+From: gg
+Subject: This patch forces exiting from fake fullscreen mode, hidden bar
+monocle, if a new non-floating window is spawned. It does cancel the real
+fullscreen.
+
+--- a/dwm.c	2022-01-23 12:08:50.425601897 +0300
++++ b/dwm.c	2022-01-23 14:30:03.673031712 +0300
+@@ -1378,6 +1378,9 @@ manage(Window w, XWindowAttributes *wa)
+ 		(unsigned char *) &(c->win), 1);
+ 	XMoveResizeWindow(dpy, c->win, c->x + 2 * sw, c->y, c->w, c->h); /* some windows require this */
+ 	setclientstate(c, NormalState);
++	/* Exit fullscreen if a new nonfloating window is created. */
++	if (!selmon->showbar && !c->isfloating)
++		fullscreen(0);
+ 	if (c->mon == selmon)
+ 		unfocus(selmon->sel, 0);
+ 	c->mon->sel = c;
