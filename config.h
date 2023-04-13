@@ -128,6 +128,8 @@ static const char *sinkswap[]   = s1("sinkswapper");
 static const char *alsatog[]    = s2("volume-bar", "tog");
 static const char *alsadec[]    = s2("volume-bar", "dec");
 static const char *alsainc[]    = s2("volume-bar", "inc");
+static const char *mounter[]    = s1("mounter");
+static const char *unmounter[]  = s1("unmounter");
 static const char *mpcprev[]    = s2("mpc", "prev");
 static const char *mpcnext[]    = s2("mpc", "next");
 static const char *mpcdec[]     = s3("mpc", "volume", "-10");
@@ -159,17 +161,16 @@ static const char *glossdec[]   = { "/bin/sh", "-c", "dimness-bar -", NULL};
 
 
 static const Key keys[] = {
-	TAGKEYS( XK_1, 0)
-	TAGKEYS( XK_2, 1)
-	TAGKEYS( XK_3, 2)
-	TAGKEYS( XK_4, 3)
-	TAGKEYS( XK_5, 4)
-	TAGKEYS( XK_6, 5)
-	TAGKEYS( XK_7, 6)
+	TAGKEYS(XK_1, 0)
+	TAGKEYS(XK_2, 1)
+	TAGKEYS(XK_3, 2)
+	TAGKEYS(XK_4, 3)
+	TAGKEYS(XK_5, 4)
+	TAGKEYS(XK_6, 5)
+	TAGKEYS(XK_7, 6)
 
 /* Note that if keys are already mapped, xev shall show them unrecognizable.*/
 //	  modifier      key             function        argument
-
 //	{ MOD,          XK_Escape,      ,               {}                   },
 	{ 0,            XK_Print,       spawn,          {.v = screenshot}    },
 //	{ ShiftMask,    XK_Print,       spawn,          {.v = }              },
@@ -183,7 +184,7 @@ static const Key keys[] = {
 	{ 0,            XK_AudioMute,   spawn,          {.v = alsatog}       },
 	{ 0,            XK_AudioInc,    spawn,          {.v = alsainc}       },
 	{ 0,            XK_AudioLow,    spawn,          {.v = alsadec}       },
-	{ MOD,          XK_F1,          spawn,          {.v = studio_sc}     },
+//	{ MOD,          XK_F1,          spawn,          {}                   },
 //	{ MOD,          XK_F2,          ,               {}                   },
 //	{ MOD,          XK_F3,          ,               {}                   },
 //	{ MOD,          XK_F4,          ,               {}                   },
@@ -194,7 +195,8 @@ static const Key keys[] = {
 //	{ MOD,          XK_F9,          ,               {}                   },
 //	{ MOD,          XK_F10,         ,               {}                   },
 //	{ MOD,          XK_F11,         ,               {}                   },
-//	{ MOD,          XK_F12,         ,               {}                   },
+	{ MOD,          XK_F12,         spawn,          {.v = mounter}       },
+	{ MOD|ALT,      XK_F12,         spawn,          {.v = unmounter}     },
 //	{ MOD,          XK_grave,       ,               {}                   },
 	{ MOD,          XK_q,           killclient,     {0}                  },
 	{ MOD|SHIFT,    XK_q,           quit,           {0}                  },
