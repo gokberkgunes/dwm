@@ -1,3 +1,4 @@
+
 static void
 monocle(Monitor *m)
 {
@@ -13,19 +14,23 @@ monocle(Monitor *m)
 		resize(c, m->wx, m->wy, m->ww - 2 * c->bw, m->wh - 2 * c->bw, 0);
 }
 
+
+
 static void
 mastergrid(Monitor *m) {
 	int i, gap;
-	unsigned int n, cols, rows, cn, rn, cx, cy, cw, ch, mw, mh, my;
+	unsigned int n, cols, rows, cn, rn, cx, cy, cw, ch, mw, mh, my, eh = 0;
 	Client *c;
 
 	for (n = 0, c = nexttiled(m->clients); c; c = nexttiled(c->next), n++);
 	if (n == 0)
 		return;
+
 	/* dynamic gapps if there are more than 4 slaves */
-	gap = (n > 4) ? (gappx - 2*(n - 4)) : gappx;
-	/* If gap is negative force it to 0 */
-	gap = (gap < 0) ? 0 : gap;
+	if (n > 4) {
+		gap = ((gap = gappx - 2*(n - 4)) > 0) ? gap : 0;
+	} else
+		gap = gappx;
 	/* vertical monitor, vertically stacked windows */
 	if (m->mh > m->mw)
 		m->nmaster = 0;
@@ -42,7 +47,7 @@ mastergrid(Monitor *m) {
 		n--;
 	}
 	/* Calculate how many rows required */
-	for (rows = 0; rows*rows < n; rows++);
+	for (rows = 1; rows*rows < n; rows++);
 	/* set tiling layout until we have more than 3 slaves */
 	if (n == 3)
 		rows = 3;
@@ -66,13 +71,18 @@ mastergrid(Monitor *m) {
 		cw = cols ? (m->ww - mw)/cols : (m->ww - mw) - gap;
 		cx = m->wx + cn*cw + mw;
 		cy = m->wy + rn*ch;
-		resize(c, cx, cy + gap, cw - 2*c->bw - gap,
-			ch - 2*c->bw - gap, 0);
-		cn++;
-		if (cn >= cols) {
+
+
+		if (++cn >= cols) {
 			cn = 0;
 			rn++;
 		}
+		/* add unused pixels to the bottom row clients */
+		if (rn == rows - 1)
+			eh =  m->wh - ch*rows - gap;
+
+		resize(c, cx, cy + gap, cw - 2*c->bw - gap,
+			ch - 2*c->bw - gap + eh, 0);
 	}
 }
 
@@ -82,7 +92,7 @@ gapfulgrid(Monitor *m) {
 	unsigned int n, cols, rows, cn, rn, i, cx, cy, cw, ch;
 	Client *c;
 
-	for(n = 0, c = nexttiled(m->clients); c; c = nexttiled(c->next), n++) ;
+	for(n = 0, c = nexttiled(m->clients); c; c = nexttiled(c->next), n++);
 	if(n == 0)
 		return;
 
@@ -92,25 +102,31 @@ gapfulgrid(Monitor *m) {
 
 	/* window geometries */
 	cw = cols ? (m->ww-gappx) / cols : m->ww;
+
 	cn = 0; /* current column number */
 	rn = 0; /* current row number */
 	for(i = 0, c = nexttiled(m->clients); c; i++, c = nexttiled(c->next)) {
+
 		if(i/rows + 1 > cols - n%cols)
 			rows = n/cols + 1;
 		ch = rows ? (m->wh-gappx) / rows : m->wh;
 		cx = m->wx + cn*cw;
 		cy = m->wy + rn*ch;
-		resize(c,
-			cx + gappx,
-			cy + gappx,
-			cw - 2 * c->bw - gappx,
-			ch - 2 * c->bw - gappx,
-			False);
-		rn++;
-		if(rn >= rows) {
+
+		/* prepare to move to the next column */
+		if(++rn >= rows) {
 			rn = 0;
 			cn++;
+			/* add unused pixels to the bottom row clients */
+			ch += m->wh - ch*rows - gappx;
 		}
+
+		resize(c,
+		       cx + gappx,
+		       cy + gappx,
+		       cw - 2 * c->bw - gappx,
+		       ch - 2 * c->bw - gappx,
+		       0);
 	}
 }
 

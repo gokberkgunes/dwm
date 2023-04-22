@@ -3,10 +3,6 @@ Subject: This patch introduces two new features to dwm. First feature is
 a function to allow cycling layouts; the second trait is combining all layouts
 and some new new layouts into a new file.
 
- config.def.h |  13 ++--
- dwm.c        |  56 ++++-------------
- layouts.c    | 193 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
- 3 files changed, 210 insertions(+), 52 deletions(-)
 
 diff --git a/config.def.h b/config.def.h
 index 9efa774..c136d7f 100644
@@ -170,7 +166,7 @@ new file mode 100644
 index 0000000..6b248f4
 --- /dev/null
 +++ b/layouts.c
-@@ -0,0 +1,195 @@
+@@ -0,0 +1,203 @@
 +static void
 +monocle(Monitor *m)
 +{
@@ -189,16 +185,17 @@ index 0000000..6b248f4
 +static void
 +mastergrid(Monitor *m) {
 +	int i, gap;
-+	unsigned int n, cols, rows, cn, rn, cx, cy, cw, ch, mw, mh, my;
++	unsigned int n, cols, rows, cn, rn, cx, cy, cw, ch, mw, mh, my, eh = 0;
 +	Client *c;
 +
 +	for (n = 0, c = nexttiled(m->clients); c; c = nexttiled(c->next), n++);
 +	if (n == 0)
 +		return;
 +	/* dynamic gapps if there are more than 4 slaves */
-+	gap = (n > 4) ? (gappx - (n - 4)) : gappx;
-+	/* If gap is negative force it to 0 */
-+	gap = (gap < 0) ? 0 : gap;
++	if (n > 4)
++		gap = ((gap = gappx - 2*(n - 4)) > 0) ? gap : 0;
++	else
++		gap = gappx;
 +	/* vertical monitor, vertically stacked windows */
 +	if (m->mh > m->mw)
 +		m->nmaster = 0;
@@ -215,7 +212,7 @@ index 0000000..6b248f4
 +		n--;
 +	}
 +	/* Calculate how many rows required */
-+	for (rows = 0; rows*rows < n; rows++);
++	for (rows = 1; rows*rows < n; rows++);
 +	/* set tiling layout until we have more than 3 slaves */
 +	if (n == 3)
 +		rows = 3;
@@ -239,13 +236,17 @@ index 0000000..6b248f4
 +		cw = cols ? (m->ww - mw)/cols : (m->ww - mw) - gap;
 +		cx = m->wx + cn*cw + mw;
 +		cy = m->wy + rn*ch;
-+		resize(c, cx, cy + gap, cw - 2*c->bw - gap,
-+			ch - 2*c->bw - gap, 0);
-+		cn++;
-+		if (cn >= cols) {
++
++		if (++cn >= cols) {
 +			cn = 0;
 +			rn++;
 +		}
++		/* add unused pixels to the bottom row clients */
++		if (rn == rows - 1)
++			eh =  m->wh - ch*rows - gap;
++
++		resize(c, cx, cy + gap, cw - 2*c->bw - gap,
++			ch - 2*c->bw - gap + eh, 0);
 +	}
 +}
 +
@@ -255,7 +256,7 @@ index 0000000..6b248f4
 +	unsigned int n, cols, rows, cn, rn, i, cx, cy, cw, ch;
 +	Client *c;
 +
-+	for(n = 0, c = nexttiled(m->clients); c; c = nexttiled(c->next), n++) ;
++	for(n = 0, c = nexttiled(m->clients); c; c = nexttiled(c->next), n++);
 +	if(n == 0)
 +		return;
 +
@@ -273,17 +274,20 @@ index 0000000..6b248f4
 +		ch = rows ? (m->wh-gappx) / rows : m->wh;
 +		cx = m->wx + cn*cw;
 +		cy = m->wy + rn*ch;
++
++		/* prepare to move to the next column */
++		if(++rn >= rows) {
++			rn = 0;
++			cn++;
++			/* add unused pixels to the bottom row clients */
++			ch += m->wh - ch*rows - gap;
++		}
 +		resize(c,
 +			cx + gappx,
 +			cy + gappx,
 +			cw - 2 * c->bw - gappx,
 +			ch - 2 * c->bw - gappx,
 +			False);
-+		rn++;
-+		if(rn >= rows) {
-+			rn = 0;
-+			cn++;
-+		}
 +	}
 +}
 +
