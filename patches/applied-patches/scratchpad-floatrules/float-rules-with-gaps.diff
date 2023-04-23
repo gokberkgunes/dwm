@@ -9,7 +9,7 @@ If the coordinates are good, move the window with respect to the center of the
 screen.
 
 diff --git a/config.def.h b/config.def.h
-index 9efa774..a12b621 100644
+index 9efa774..6a1c548 100644
 --- a/config.def.h
 +++ b/config.def.h
 @@ -2,6 +2,7 @@
@@ -33,8 +33,17 @@ index 9efa774..a12b621 100644
  };
 
  /* layout(s) */
+@@ -77,6 +78,8 @@ static const Key keys[] = {
+ 	{ MODKEY,                       XK_t,      setlayout,      {.v = &layouts[0]} },
+ 	{ MODKEY,                       XK_f,      setlayout,      {.v = &layouts[1]} },
+ 	{ MODKEY,                       XK_m,      setlayout,      {.v = &layouts[2]} },
++	{ MODKEY,                       XK_n,      gapchange,      {.i = +1 } },
++	{ MODKEY|ShiftMask,             XK_n,      gapchange,      {.i = -1 } },
+ 	{ MODKEY,                       XK_space,  setlayout,      {0} },
+ 	{ MODKEY|ShiftMask,             XK_space,  togglefloating, {0} },
+ 	{ MODKEY,                       XK_0,      view,           {.ui = ~0 } },
 diff --git a/dwm.c b/dwm.c
-index 253aba7..3cc5b6c 100644
+index f1d86b2..4b673ef 100644
 --- a/dwm.c
 +++ b/dwm.c
 @@ -139,6 +139,7 @@ typedef struct {
@@ -45,7 +54,15 @@ index 253aba7..3cc5b6c 100644
  } Rule;
 
  /* function declarations */
-@@ -280,7 +281,7 @@ void
+@@ -169,6 +170,7 @@ static void focus(Client *c);
+ static void focusin(XEvent *e);
+ static void focusmon(const Arg *arg);
+ static void focusstack(const Arg *arg);
++static void gapchange(const Arg *arg);
+ static Atom getatomprop(Client *c, Atom prop);
+ static int getrootptr(int *x, int *y);
+ static long getstate(Window w);
+@@ -279,7 +281,7 @@ void
  applyrules(Client *c)
  {
  	const char *class, *instance;
@@ -54,7 +71,7 @@ index 253aba7..3cc5b6c 100644
  	const Rule *r;
  	Monitor *m;
  	XClassHint ch = { NULL, NULL };
-@@ -300,6 +301,78 @@ applyrules(Client *c)
+@@ -299,6 +301,78 @@ applyrules(Client *c)
  		{
  			c->isfloating = r->isfloating;
  			c->tags |= r->tags;
@@ -133,3 +150,25 @@ index 253aba7..3cc5b6c 100644
  			for (m = mons; m && m->num != r->monitor; m = m->next);
  			if (m)
  				c->mon = m;
+@@ -861,6 +935,21 @@ focusstack(const Arg *arg)
+ 	}
+ }
+
++void
++gapchange(const Arg *arg)
++{
++       int ngappx = gappx + (int)arg->i;
++
++       if (ngappx > 20 || ngappx < 0)
++                return;
++       else
++               gappx = ngappx;
++
++       /* arrange all monitors */
++       for (Monitor *m = mons; m; m = m->next)
++               arrange(m);
++}
++
+ Atom
+ getatomprop(Client *c, Atom prop)
+ {

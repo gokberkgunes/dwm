@@ -185,6 +185,7 @@ static int getrootptr(int *x, int *y);
 static long getstate(Window w);
 static pid_t getstatusbarpid();
 static int gettextprop(Window w, Atom atom, char *text, unsigned int size);
+static void gapchange(const Arg *arg);
 static void grabbuttons(Client *c, int focused);
 static void grabkeys(void);
 static void incnmaster(const Arg *arg);
@@ -1192,6 +1193,21 @@ focusstack(const Arg *arg)
 	}
 }
 
+void
+gapchange(const Arg *arg)
+{
+	int ngappx = gappx + (int)arg->i;
+
+	if (ngappx > 20 || ngappx < 0)
+		 return;
+	else
+		gappx = ngappx;
+
+	/* arrange all monitors */
+	for (Monitor *m = mons; m; m = m->next)
+		arrange(m);
+}
+
 Atom
 getatomprop(Client *c, Atom prop)
 {
@@ -1863,7 +1879,6 @@ fullscreen(const Arg *arg)
 	}
 	togglebar(arg);
 }
-
 void
 setlayout(const Arg *arg)
 {

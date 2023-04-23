@@ -35,7 +35,7 @@ const Sp sptabbed = { .class = "tabbed" };
 const Sp spsteam  = { .class = "Steam", sp_s1("steam") };
 const Sp spmpv    = { .class = "mpv" };
 const Sp spftube  = { .class = "FreeTube", sp_s1("freetube") };
-const Sp spcalc   = { .class = "spcalc", sp_sh("st -c spcalc calc -d0") };
+const Sp spcalc   = { .class = "spcalc", sp_sh("st -c spcalc calc -d") };
 const Sp spmusc   = { .class = "spmusc", sp_sh("st -c spmusc ncmpcpp") };
 
 static const char *tags[] = { "1", "2", "3", "4", "5", "6", "7" };
@@ -138,7 +138,7 @@ static const char *mpctog[]     = s2("mpc", "toggle");
 static const char *screenshot[] = s1("screenshotter");
 static const char *startrec[]   = s1("dmenurecord");
 static const char *stoprec[]    = s2("dmenurecord", "kill");
-static const char *powerman[]   = s1("sysact");
+static const char *powerman[]   = s1("syser");
 static const char *mpvvid[]     = sh("mpv $(xclip -o)");
 // make a function to save pid, and when pressed again kill it since
 //static const char *mpvsnd[]   = sh("mpv --vid=no $(xclip -o)");
@@ -271,8 +271,8 @@ static const Key keys[] = {
 	{ MOD|SHIFT,    XK_space,       togglefloating, {0}                  },
 	{ MOD,          XK_0,           view,           {.ui = ~0}           },
 	{ MOD|SHIFT,    XK_0,           tag,            {.ui = ~0}           },
-//	{ MOD,          XK_period,      focusmon,        {.i = +1}           },
-//	{ MOD|SHIFT,    XK_period,      tagmon,         {.i = +1}            },
+	{ MOD,          XK_period,      gapchange,      {.i = +1}            },
+	{ MOD|SHIFT,    XK_period,      gapchange,      {.i = -1}            },
 	{ MOD,          XK_BackSpace,   spawn,          {.v = powerman}      },
 	{ MOD,          XK_equal,       spawn,          {.v = mpcinc}        },
 //	{ MOD,          XK_Left,        ,               {}                   },
