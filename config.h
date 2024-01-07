@@ -15,8 +15,8 @@ static const char *colors[][3]     = {
 	[SchemeNorm] = { nor_fg_clr, nor_bg_clr, nor_edge_clr },
 	[SchemeSel]  = { sel_fg_clr, sel_bg_clr, sel_edge_clr },
 };
-static const char *fonts[]   = { "Gohu GohuFont:pixelsize=11",
-                                 "Symbols Nerd Font:pixelsize=12" };
+static const char *fonts[]   = { "Gohu GohuFont:pixelsize=14",
+                                 "Symbols Nerd Font:pixelsize=14" };
 
 
 /* SCRATCHPAD DEFINITIONS */
@@ -35,6 +35,8 @@ const Sp sptabbed = { .class = "tabbed" };
 const Sp spsteam  = { .class = "Steam", sp_s1("steam") };
 const Sp spmpv    = { .class = "mpv" };
 const Sp spftube  = { .class = "FreeTube", sp_s1("freetube") };
+const Sp spjabref = { .class = "org.jabref.gui.MainApplication",
+                      sp_s1("jabref") };
 const Sp spcalc   = { .class = "spcalc", sp_sh("st -c spcalc calc -d") };
 const Sp spmusc   = { .class = "spmusc", sp_sh("st -c spmusc ncmpcpp") };
 
@@ -65,6 +67,9 @@ static const Rule rules[] = {
 	{ "zoom",       0, 0, 0,    1,  0,  0, -1,                       },
 	{ "Inkscape",   0, 0, 0,    0,  0,  0, -1,                       },
 	{ "tabbed",     0, 0, 0,    0,  0,  1, -1,                       },
+	{ "org.jabref.gui.MainApplication",
+	                0, 0, 0,    1,  0,  1, -1, 0,0,1000,1000         },
+	{ "Gui.pyc",    0, 0, 0,    1,  0,  1, -1,                       },
 	/*title         tag mask float term  noswal mon */
 	{ 0,     0, "Event Tester", 0,  0,   0,    1,    -1 },
 
@@ -145,8 +150,11 @@ static const char *mpvvid[]     = sh("mpv $(xclip -o)");
 // runs without a video... (if you run without st -e)
 // This is temporary fix, empty terminal screen:
 static const char *mpvaud[]     = sh("st -e mpv --vid=no $(xclip -o)");
-static const char *glossinc[]   = { "/bin/sh", "-c", "dimness-bar +", NULL};
-static const char *glossdec[]   = { "/bin/sh", "-c", "dimness-bar -", NULL};
+static const char *glossinc[]   = s2("dimness-bar", "+");
+static const char *glossdec[]   = s2("dimness-bar", "-");
+static const char *killsckey[]  = s2("pkill", "screenkey");
+static const char *screenkey[]  = s3("screenkey", "--opacity", "0.5");
+static const char *pomo[]       = s2("pomodoro-bar", "start");
 
 /* KEYBINDINGS
  * Instead of using #include <X11/XF86keysym.h> preferring hex codes which
@@ -194,7 +202,8 @@ static const Key keys[] = {
 //	{ MOD,          XK_F8,          ,               {}                   },
 //	{ MOD,          XK_F9,          ,               {}                   },
 //	{ MOD,          XK_F10,         ,               {}                   },
-//	{ MOD,          XK_F11,         ,               {}                   },
+	{ MOD|ALT,      XK_F11,         spawn,          {.v = killsckey}     },
+	{ MOD,          XK_F11,         spawn,          {.v = screenkey}     },
 	{ MOD,          XK_F12,         spawn,          {.v = mounter}       },
 	{ MOD|ALT,      XK_F12,         spawn,          {.v = unmounter}     },
 //	{ MOD,          XK_grave,       ,               {}                   },
@@ -205,9 +214,10 @@ static const Key keys[] = {
 	{ MOD|ALT,      XK_w,           spawn,          {.v = chromium}      },
 	{ MOD,          XK_e,           togglescratch,  {.v = &spsignal}     },
 	{ MOD|ALT,      XK_e,           togglescratch,  {.v = &sptabbed}     },
-	{ MOD,          XK_r,           togglescratch,  {.v = &spftube}      },
-	{ MOD|SHIFT,    XK_r,           spawn,          {.v = mpvvid}        },
-	{ MOD|ALT,      XK_r,           spawn,          {.v = mpvaud}        },
+	{ MOD,          XK_r,           togglescratch,  {.v = &spjabref}     },
+	{ MOD|ALT,      XK_r,           togglescratch,  {.v = &spftube}      },
+//	{ MOD|SHIFT,    XK_r,           spawn,          {.v = mpvvid}        },
+//	{ MOD|ALT,      XK_r,           spawn,          {.v = mpvaud}        },
 //	{ MOD|SHIFT,    XK_r,           spawn,          {.v = htop}          },
 	{ MOD,          XK_t,           togglescratch,  {.v = &spmpv}        },
 	{ MOD|ALT,      XK_t,           togglescratch,  {.v = &spsteam}      },
@@ -220,7 +230,7 @@ static const Key keys[] = {
 	{ MOD,          XK_o,           incnmaster,     {.i = +1}            },
 	{ MOD|SHIFT,    XK_o,           incnmaster,     {.i = -1}            },
 	{ MOD,          XK_p,           spawn,          {.v = mpctog}        },
-//	{ MOD|SHIFT,    XK_p,           spawn,          {0}                  },
+	{ MOD|SHIFT,    XK_p,           spawn,          {.v = pomo}          },
 	{ MOD,          XK_lbracket,    spawn,          {.v = mpcprev}       },
 //	{ MOD|SHIFT,    XK_lbracket,    spawn,          {0}                  },
 	{ MOD,          XK_rbracket,    spawn,          {.v = mpcnext}       },
