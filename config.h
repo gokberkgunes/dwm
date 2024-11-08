@@ -4,9 +4,9 @@ static const unsigned int snap     = 0;  // snap pixel for floating windows
 static const int swallowfloating   = 1;  // 1 means swallow floating windows
 static const int showbar           = 1;  // 0 means no bar
 static const int topbar            = 1;  // 0: bottom bar
-static const char nor_bg_clr[]     = "#121212"; // bar color
+static const char nor_bg_clr[]     = "#000000"; // bar color
 static const char nor_fg_clr[]     = "#c5ebed";
-static const char nor_edge_clr[]   = "#121212"; // non-selected edge
+static const char nor_edge_clr[]   = "#000000"; // non-selected edge
 static const char sel_bg_clr[]     =  ENVCOLOR; // selected tab background
 static const char sel_fg_clr[]     = "#929292";
 static const char sel_edge_clr[]   =  ENVCOLOR;
@@ -30,7 +30,9 @@ typedef struct {
 
 const Sp spsignal = { .class = "Signal", sp_s1("signal-desktop") };
 const Sp spkpass  = { .class = "KeePassXC", sp_s1("keepassxc") };
-const Sp spst     = { .class = "spterm", sp_sh("st -t '' -c spterm") };
+const Sp spst     = { .class = "spterm", sp_sh("tabbed -C spterm st -w") };
+
+//static const char *st[]         = s3("tabbed", "st", "-w");
 const Sp sptabbed = { .class = "tabbed" };
 const Sp spsteam  = { .class = "Steam", sp_s1("steam") };
 const Sp spmpv    = { .class = "mpv" };
@@ -150,11 +152,11 @@ static const char *mpvvid[]     = sh("mpv $(xclip -o)");
 // runs without a video... (if you run without st -e)
 // This is temporary fix, empty terminal screen:
 static const char *mpvaud[]     = sh("st -e mpv --vid=no $(xclip -o)");
-static const char *glossinc[]   = s2("dimness-bar", "+");
-static const char *glossdec[]   = s2("dimness-bar", "-");
+//static const char *glossinc[]   = s2("dimness-bar", "+");
+//static const char *glossdec[]   = s2("dimness-bar", "-");
 static const char *killsckey[]  = s2("pkill", "screenkey");
-static const char *screenkey[]  = s3("screenkey", "--opacity", "0.5");
-static const char *pomo[]       = s2("pomodoro-bar", "start");
+//static const char *screenkey[]  = s3("screenkey", "--opacity", "0.5");
+static const char *pomo[]       = sh("pomodoro-bar start 25 5");
 
 /* KEYBINDINGS
  * Instead of using #include <X11/XF86keysym.h> preferring hex codes which
@@ -186,8 +188,8 @@ static const Key keys[] = {
 //	{ 0,            XK_Scroll_Lock, spawn,          {.v = }              },
 //	{ 0,            XK_Scroll_Lock, spawn,          {.v = }              },
 	{ MOD,          XK_Delete,      spawn,          {.v = stoprec}       },
-	{ MOD,          XK_Home,        spawn,          {.v = glossinc}      },
-	{ MOD,          XK_End,         spawn,          {.v = glossdec}      },
+	//{ MOD,          XK_Home,        spawn,          {.v = }      },
+	//{ MOD,          XK_End,         spawn,          {.v = }      },
 	{ MOD,          XK_AudioMute,   spawn,          {.v = sinkswap}      },
 	{ 0,            XK_AudioMute,   spawn,          {.v = alsatog}       },
 	{ 0,            XK_AudioInc,    spawn,          {.v = alsainc}       },
@@ -203,7 +205,7 @@ static const Key keys[] = {
 //	{ MOD,          XK_F9,          ,               {}                   },
 //	{ MOD,          XK_F10,         ,               {}                   },
 	{ MOD|ALT,      XK_F11,         spawn,          {.v = killsckey}     },
-	{ MOD,          XK_F11,         spawn,          {.v = screenkey}     },
+//	{ MOD,          XK_F11,         spawn,          {.v = screenkey}     },
 	{ MOD,          XK_F12,         spawn,          {.v = mounter}       },
 	{ MOD|ALT,      XK_F12,         spawn,          {.v = unmounter}     },
 //	{ MOD,          XK_grave,       ,               {}                   },
