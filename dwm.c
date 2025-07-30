@@ -1879,15 +1879,25 @@ setfullscreen(Client *c, int fullscreen)
 	}
 }
 
-Layout *last_layout;
 void
 fullscreen(const Arg *arg)
 {
-	if (selmon->showbar) {
-		for (last_layout = (Layout *)layouts; last_layout != selmon->lt[selmon->sellt]; last_layout++);
+	//if (!selmon->sel) { /* just toggle if no window */
+	//	togglebar(arg);
+	//	return;
+	//}
+
+	if (selmon->sel && selmon->showbar) {
+		//for (last_layout = (Layout *)layouts;
+		//     last_layout != selmon->lt[selmon->sellt]; last_layout++);
+		if (selmon->sel->isfloating) {
+			selmon->sel->isfloating = !selmon->sel->isfloating;
+			resize(selmon->sel, selmon->sel->x, selmon->sel->y,
+			       selmon->sel->w, selmon->sel->h, 0);
+		}
 		setlayout(&((Arg) { .v = &layouts[2] }));
 	} else {
-		setlayout(&((Arg) { .v = last_layout }));
+		setlayout(&((Arg) { .v = &layouts[0] }));
 	}
 	togglebar(arg);
 }
@@ -2112,7 +2122,10 @@ togglefloating(const Arg *arg)
 		return;
 	if (selmon->sel->isfullscreen) /* no support for fullscreen windows */
 		return;
-	selmon->sel->isfloating = !selmon->sel->isfloating || selmon->sel->isfixed;
+	/* Ignore isfixed. Even allow fixed to become windowed. This is used
+	 * for some games.
+	 */
+	selmon->sel->isfloating = !selmon->sel->isfloating;
 	if (selmon->sel->isfloating)
 		resize(selmon->sel, selmon->sel->x, selmon->sel->y,
 			selmon->sel->w, selmon->sel->h, 0);
@@ -2495,6 +2508,8 @@ updatesizehints(Client *c)
 		c->maxa = (float)size.max_aspect.x / size.max_aspect.y;
 	} else
 		c->maxa = c->mina = 0.0;
+	// c->isfixed causes fullscreen to become floating windowed for a game,
+	// disable it.
 	c->isfixed = (c->maxw && c->maxh && c->maxw == c->minw && c->maxh == c->minh);
 	c->hintsvalid = 1;
 }
