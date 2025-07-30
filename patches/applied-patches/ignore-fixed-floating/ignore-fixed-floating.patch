@@ -1,0 +1,20 @@
+From: gg
+Subject: Allow fixed windows to be windowed. This is used with fake fullscreen,
+monocle, to make fixed games to be fullscreen.
+
+diff --git a/dwm.c b/dwm.c
+index 1443802..2404403 100644
+--- a/dwm.c
++++ b/dwm.c
+@@ -1727,7 +1727,10 @@ togglefloating(const Arg *arg)
+ 		return;
+ 	if (selmon->sel->isfullscreen) /* no support for fullscreen windows */
+ 		return;
+-	selmon->sel->isfloating = !selmon->sel->isfloating || selmon->sel->isfixed;
++	/* Ignore isfixed. Even allow fixed to become windowed. This is used
++	 * for some games.
++	 */
++	selmon->sel->isfloating = !selmon->sel->isfloating; 
+ 	if (selmon->sel->isfloating)
+ 		resize(selmon->sel, selmon->sel->x, selmon->sel->y,
+ 			selmon->sel->w, selmon->sel->h, 0);
